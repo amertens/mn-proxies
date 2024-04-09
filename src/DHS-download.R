@@ -30,6 +30,8 @@ set_rdhs_config(email = "amertens@berkeley.edu",
                 data_frame = "data.table::as.data.table",
                 config_path = "~/.rdhs.json",
                 global = TRUE)
+#sctXX5E87xJbD*
+
 #Check account
 config <-get_rdhs_config()
 rdhs:::authenticate_dhs(config)
@@ -41,6 +43,7 @@ avail_data
 
 indicators <- dhs_indicators()
 tail(indicators[grepl("anemia", Label), .(IndicatorId, ShortName, Label)])
+write.csv(indicators,paste0(here::here(),"/metadata/dhs_indicators.csv"))
 
 countries <- dhs_countries() %>% as.data.table()
 # dhscc <- countries[CountryName %in% c("Armenia", "Cambodia", "Lesotho"), DHS_CountryCode]
@@ -57,7 +60,21 @@ ggplot(statcomp, aes(SurveyYear, Value, col=CountryName)) +
   geom_point() + geom_line()
 
 surveychar <- dhs_survey_characteristics()
+write.csv(surveychar,paste0(here::here(),"/metadata/dhs_survey_characteristics.csv"))
+
+
+surveys_all <- dhs_surveys()
+write.csv(surveys_all, paste0(here::here(),"/metadata/dhs_survey_all.csv"))
+
 surveychar[grepl("Vitamin A questions", SurveyCharacteristicName, ignore.case=TRUE)]
+surveychar[grepl("Micron", SurveyCharacteristicName, ignore.case=TRUE)]
+surveys <- dhs_surveys(surveyCharacteristicIds = 20, countryIds = dhscc) %>% as.data.table()
+surveys <- dhs_surveys(surveyCharacteristicIds = 122, countryIds = dhscc) %>% as.data.table()
+
+datasets_all <- dhs_datasets()
+write.csv(datasets_all, paste0(here::here(),"/metadata/dhs_datasets_all.csv"))
+
+
 
 surveys <- dhs_surveys(surveyCharacteristicIds = 41, countryIds = dhscc) %>% as.data.table()
 surveys[,.(SurveyId, CountryName, SurveyYear, NumberOfWomen, SurveyNum, FieldworkEnd)]
@@ -74,44 +91,23 @@ datasets[, .(SurveyId, SurveyNum, FileDateLastModified, FileName)]
 datasets$path <- unlist(get_datasets(datasets$FileName))
 
 
-survs <- dhs_surveys(surveyCharacteristicIds = 89,
-                     countryIds = c("CD","TZ"),
-                     surveyType = "DHS",
-                     surveyYearStart = 2013)
+d <- readRDS(datasets$path[7])
+head(d)
+labels(d)
 
-# and lastly use this to find the datasets we will want to download and let's download the flat files (.dat) datasets (have a look in the dhs_datasets documentation for all argument options, and fileformat abbreviations etc.)
-datasets <- dhs_datasets(surveyIds = survs$SurveyId, fileFormat = "flat")
-str(datasets)
+labels <- sapply(d, function(x) attr(x, "label"))
+labels[grepl('nutr',labels)]
+# multiple micronutrient powder
 
-#microbenchmark::microbenchmark(dhs_surveys(surveyYear = 1992),times = 1)
+print_labels(colnames(d))
+d$v001
 
-# download datasets
-downloads <- get_datasets(datasets$FileName, clear_cache=T)
+sapply(dat, is.labelled)
+dat$v456 <- zap_labels(dat$v456)
+dat <- as_factor(dat)
 
-downloads <- get_datasets('AFBR71DT.ZIP')
-
-dataset_filenames='AFBR71DT.ZIP'
-
- download_option = "rds"
- reformat = FALSE
-         all_lower = TRUE
-         output_dir_root = NULL
-         clear_cache = FALSE
-
-  client <- check_for_client()
-  if (is.null(output_dir_root)) {
-    output_dir_root <- file.path(client$get_root(), "datasets")
-  }
-  client$get_datasets(dataset_filenames, download_option = download_option,
-                      reformat = reformat, all_lower = all_lower, output_dir_root = output_dir_root,
-                      clear_cache = clear_cache)
-
-
-
-  datasets <- dhs_datasets(surveyIds = 'AF2015DHS', fileFormat = "flat")
-  datasets
-
-  downloads <- get_datasets(datasets$FileName, clear_cache=T)
-
- df <- readRDS(downloads$AFBR71FL)
-head(df)
+with(dat, table(SurveyId, v025, useNA="ifany"))
+with(dat, table(SurveyId, v106, useNA="ifany"))
+with(dat, table(SurveyId, v454, useNA="ifany"))
+with(dat, table(SurveyId, v455, useNA="ifany"))
+with(dat, table(v042, v454, useNA="ifany"))
