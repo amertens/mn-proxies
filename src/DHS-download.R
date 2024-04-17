@@ -20,7 +20,7 @@
 
 library(rdhs)
 library(data.table)
-library(ggplot2)
+library(tidyverse)
 library(survey)
 library(haven)
 
@@ -44,6 +44,18 @@ avail_data
 indicators <- dhs_indicators()
 tail(indicators[grepl("anemia", Label), .(IndicatorId, ShortName, Label)])
 write.csv(indicators,paste0(here::here(),"/metadata/dhs_indicators.csv"))
+
+unique(indicators$Level2)
+
+indicator_types <- indicators %>% distinct(Level2, .keep_all=T) %>%
+  select(Level2, Label,Level1, Level3) %>%
+  rename(`Variable type`=Level2,
+         `Example variable`=Label,
+         `Module`=Level1,
+         `Survey`=Level3)
+write.csv(indicator_types,paste0(here::here(),"/metadata/dhs_indicator_types.csv"))
+
+
 
 countries <- dhs_countries() %>% as.data.table()
 # dhscc <- countries[CountryName %in% c("Armenia", "Cambodia", "Lesotho"), DHS_CountryCode]
