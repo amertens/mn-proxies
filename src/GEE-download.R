@@ -4,14 +4,16 @@
 #install.packages("rgee")
 library(rgee)
 
-#ee_check()
-# ee_install()
+ee_check()
+# ee_clean_pyenv()
+# ee_install(py_env = "rgee")
 #1
 # ee_install_set_pyenv(py_path="C:/Users/andre/AppData/Local/r-miniconda/envs/rgee/python.exe",
-#                      py_env = "YOUR_ENV")\
-ee_clean_user_credentials()
-ee_Authenticate()
-ee_Initialize()
+#                      py_env = "YOUR_ENV")
+
+# ee_Initialize(user = 'amertens@berkeley.edu')
+# ee_Authenticate()
+# ee_clean_user_credentials()
 
 srtm <- ee$Image("USGS/SRTMGL1_003")
 viz <- list(
