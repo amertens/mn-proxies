@@ -29,7 +29,8 @@ Map$addLayer(
 )
 
 
-test <- ee$Image("CSIC/SPEI/2_9")
+
+test <- ee$Image("BIOPAMA/GlobalOilPalm/v1")
 test$bandNames()$getInfo()
 
 srtm$bandNames()$getInfo()
