@@ -14,10 +14,7 @@
 # https://tech.popdata.org/dhs-research-hub/posts/2024-02-04-dhs-chirps/
 #------------------------------------------------------------------------------
 
-
-
-
-
+rm(list=ls())
 library(rdhs)
 library(data.table)
 library(tidyverse)
@@ -39,7 +36,6 @@ rdhs:::authenticate_dhs(config)
 avail_data=rdhs:::available_datasets(config)
 avail_data
 
-#maybe check if my password can't have special characters
 
 indicators <- dhs_indicators()
 tail(indicators[grepl("anemia", Label), .(IndicatorId, ShortName, Label)])
@@ -62,6 +58,7 @@ countries <- dhs_countries() %>% as.data.table()
 # dhscc
 
 dhscc <- countries[CountryName %in% c("Bangladesh"), DHS_CountryCode]
+dhscc <- countries[CountryName %in% c("Zambia"), DHS_CountryCode]
 dhscc
 
 
@@ -81,7 +78,6 @@ write.csv(surveys_all, paste0(here::here(),"/metadata/dhs_survey_all.csv"))
 surveychar[grepl("Vitamin A questions", SurveyCharacteristicName, ignore.case=TRUE)]
 surveychar[grepl("Micron", SurveyCharacteristicName, ignore.case=TRUE)]
 surveys <- dhs_surveys(surveyCharacteristicIds = 20, countryIds = dhscc) %>% as.data.table()
-surveys <- dhs_surveys(surveyCharacteristicIds = 122, countryIds = dhscc) %>% as.data.table()
 
 datasets_all <- dhs_datasets()
 write.csv(datasets_all, paste0(here::here(),"/metadata/dhs_datasets_all.csv"))
@@ -103,7 +99,7 @@ datasets[, .(SurveyId, SurveyNum, FileDateLastModified, FileName)]
 datasets$path <- unlist(get_datasets(datasets$FileName))
 
 
-d <- readRDS(datasets$path[7])
+d <- readRDS(datasets$path[1])
 head(d)
 labels(d)
 
