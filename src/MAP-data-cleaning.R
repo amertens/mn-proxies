@@ -13,7 +13,7 @@ library(boot)
 library(ggplot2)
 
 # Spatial utility and modelling
-#library(INLA) #https://www.r-inla.org/
+library(INLA) #https://www.r-inla.org/
 library(raster)
 library(sp)
 library(rgeos)
