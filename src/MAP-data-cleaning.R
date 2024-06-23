@@ -19,7 +19,7 @@ library(sp)
 library(rgeos)
 library(rgdal)
 library(seegSDM) # available via devtools::install_github("SEEG-Oxford/seegSDM")
-#library(seegMBG) # available via devtools::install_github("SEEG-Oxford/seegMBG")
+library(seegMBG) # available via devtools::install_github("SEEG-Oxford/seegMBG")
 
 ## Download & Visualise Response data
 
@@ -221,3 +221,45 @@ w2_plot <- autoplot(w2_df, plot_titles = "", legend_title = "PfPR", printed = FA
   guides(fill = guide_colorbar(barwidth = 1, barheight = 15))+
   theme(legend.text = element_text(size = 16), legend.title = element_text(face = "bold", size = 17), strip.text = element_text(face = "bold", size = 20))
 
+
+
+#-------------------------------------------------------------------------------
+# More code from github
+#https://github.com/malaria-atlas-project/malariaAtlas
+#-------------------------------------------------------------------------------
+
+## Loading packages
+library(tidyverse)
+library(malariaAtlas)
+
+MDG_pr_data <- getPR(country = "Madagascar", species = "both")
+head(MDG_pr_data)
+
+
+Africa_pvpr_data <- getPR(continent = "Africa", species = "Pv")
+
+Extent_pfpr_data <- getPR(extent = rbind(c(-2.460181, 13.581921), c(-3.867188, 34.277344)), species = "Pf")
+head(Extent_pfpr_data)
+
+#Note version set for reproducibility
+MDG_pr_data_202206 <- getPR(country = "Madagascar", species = "both", version = "202206")
+head(MDG_pr_data_202206)
+
+
+autoplot(MDG_pr_data)
+autoplot(MDG_pr_data, facet = FALSE)
+
+MMR_vec_data <- getVecOcc(country = "Myanmar")
+MMR_vec_data_201201 <- getVecOcc(country = "Myanmar", version = "201201")
+autoplot(MMR_vec_data)
+
+
+#getShp() downloads a shapefile for a specified country (or countries) and returns this as a simple feature object.
+MDG_shp <- getShp(ISO = "MDG", admin_level = c("admin0", "admin1"))
+autoplot(MDG_shp)
+
+#getRaster()downloads publicly available MAP rasters for a specific dataset_id & year, clipped to a given bounding box or shapefile
+MDG_shp <- getShp(ISO = "MDG", admin_level = "admin0")
+MDG_PfPR2_10 <- getRaster(dataset_id = "Explorer__2020_Global_PfPR", shp = MDG_shp, year = 2013)
+
+p <- autoplot(MDG_PfPR2_10, shp_df = MDG_shp)
