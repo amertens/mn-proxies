@@ -158,7 +158,7 @@ g1 / g2
 #7 Aggregation to higher admin levels
 #7.1 Computing population size from WorldPop raster
 
-ibrary(raster)
+library(raster)
 pop.abbrev <- "ZMB"
 year <- 2018
 pop.dir <- "../data/Zambia/worldpop"
