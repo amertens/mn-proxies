@@ -105,10 +105,16 @@ country_vec = c("Afghanistan", "Bangladesh", "Cameroon",
                 "Dominican Republic", "Guyana", "Haiti", "Madagascar",
                 "Mongolia", "Rwanda",
                 "Georgia", "Lebanon", "Morocco", "Tajikistan")
-i = "Zambia"
-surveyyear_vec=c(2000:2019)
-j = 2018
-k = indicator_vec[1]
+
+
+i = "Ghana"
+surveyyear_vec=2008
+j = 2008
+k = "womananemia"
+#note: many estimates are missing because the data downloads, but get this error:
+# Error in onestrat(x[index, , drop = FALSE], clusters[index], nPSU[index][1],  :
+#   Stratum (North East urban) has only one PSU at stage 1
+
 
 fullres=NULL
 for(i in country_vec){
@@ -155,6 +161,8 @@ for(i in country_vec){
       }else{
         fullres <- bind_rows(fullres, data.frame(country=i, year=j, indicator=k))
       }
+      saveRDS(fullres, here("data/DHS_national_indicator_prevalences_interim.rds"))
+
     }
   }
 }
@@ -163,3 +171,7 @@ fullres
 saveRDS(fullres, here("data/DHS_national_indicator_prevalences.rds"))
 
 
+
+fullres <- readRDS(here("data/DHS_national_indicator_prevalences_interim.rds"))
+dim(fullres)
+unique(fullres$country)
