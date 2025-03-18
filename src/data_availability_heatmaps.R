@@ -7,9 +7,10 @@ library(ggplot2)
 library(readxl)
 library(here)
 library(patchwork)
+here()
 
 # Function to read and process data
-file_path="landscape data/Landscape data sources/2. Hunger and Nutrition Commitment Index Africa.xlsx"
+file_path="Landscape data sources/2. Hunger and Nutrition Commitment Index Africa.xlsx"
 sheet_name = "Data (2)"
 read_and_process <- function(file_path, sheet_name = NULL, year_col = "Year", available_cols = NULL) {
 
@@ -34,23 +35,23 @@ read_and_process <- function(file_path, sheet_name = NULL, year_col = "Year", av
 }
 
 # Read and process data
-hanci_data <- read_and_process("landscape data/Landscape data sources/2. Hunger and Nutrition Commitment Index Africa.xlsx")
-fews_data <- read_and_process("landscape data/Landscape data sources/Famine Early Warning Systems Network.xlsx",
+hanci_data <- read_and_process("Landscape data sources/2. Hunger and Nutrition Commitment Index Africa.xlsx")
+fews_data <- read_and_process("Landscape data sources/Famine Early Warning Systems Network.xlsx",
                               year_col = "Years of available studies")
-ch_data <- read_and_process("landscape data/Landscape data sources/Cadre Harmonise 2.xlsx")
-faostat_data <- read_and_process("landscape data/Landscape data sources/FAOSTAT-FBS-SUA-5-21-24.xlsx",
+ch_data <- read_and_process("Landscape data sources/Cadre Harmonise 2.xlsx")
+faostat_data <- read_and_process("Landscape data sources/FAOSTAT-FBS-SUA-5-21-24.xlsx",
                                  sheet_name = "Landscape sheet",
                                  available_cols = c("Food Balance Sheet (FBS)- new methodology", "Supply and Utilization Accounts (SUA)"))
-ghed_data <- read_and_process("landscape data/Landscape data sources/Landscape_data source_GHED_2024_08_30.xlsx",
+ghed_data <- read_and_process("Landscape data sources/Landscape_data source_GHED_2024_08_30.xlsx",
                               sheet_name = "Data (2)", year_col = "year",
                               available_cols = NULL)
-flunet_data <- read_and_process("landscape data/Landscape data sources/Landscape_data source-FluNet_2024-8-30.xlsx",
+flunet_data <- read_and_process("Landscape data sources/Landscape_data source-FluNet_2024-8-30.xlsx",
                               sheet_name = "Sheet1", year_col = "Year",
                               available_cols = NULL)
-wfp_data <- read_and_process("landscape data/Landscape data sources/Landscape_data source-WFP_FoodPrices_2024-7-9.xlsx",
+wfp_data <- read_and_process("Landscape data sources/Landscape_data source-WFP_FoodPrices_2024-7-9.xlsx",
                                 sheet_name = "Sheet1", year_col = "Year",
                                 available_cols = NULL)
-hces_data <- read_excel(here("landscape data/Landscape data sources/Landscape_data source-HCES_2024-2-14.xlsx"), sheet= "HCES")  %>%
+hces_data <- read_excel(here("Landscape data sources/Landscape_data source-HCES_2024-2-14.xlsx"), sheet= "HCES")  %>%
   rename(Country = Economy) %>%
   mutate(Year = as.numeric(Year)) %>%
   filter(`HCES (Y/N)` =="Y") %>%
@@ -60,7 +61,7 @@ hces_data <- read_excel(here("landscape data/Landscape data sources/Landscape_da
 
 
 # Read DHS data
-dhs_data <- read_excel(here("landscape data/Landscape data sources/Landscape_data source_DHS_2024-04-09.xlsx"))
+dhs_data <- read_excel(here("Landscape data sources/Landscape_data source_DHS_2024-04-09.xlsx"))
 dhs_data <- dhs_data %>%
   rename(Country = Economy) %>%
   mutate(Year = as.numeric(Year)) %>%
@@ -68,7 +69,7 @@ dhs_data <- dhs_data %>%
   mutate(Available = 1)
 
 
-mics_data <- read_excel(here("landscape data/Landscape data sources/Landscape_data source_MICS_2024-04-01.xlsx"))
+mics_data <- read_excel(here("Landscape data sources/Landscape_data source_MICS_2024-04-01.xlsx"))
 mics_data <- mics_data %>%
   rename(Country = Economy) %>%
   mutate(Year = as.numeric(Year)) %>%
@@ -76,7 +77,7 @@ mics_data <- mics_data %>%
   mutate(Available = 1)
 
 
-vmnis_data <- read_excel(here("landscape data/Landscape data sources/Landscape_data source-VMNIS_2024-02-15.xlsx"), sheet="List of economies")
+vmnis_data <- read_excel(here("Landscape data sources/Landscape_data source-VMNIS_2024-02-15.xlsx"), sheet="List of economies")
 vmnis_data <- vmnis_data %>%
   rename(Country = Economy) %>%
   mutate(Year = as.numeric(Year)) %>%
@@ -157,7 +158,7 @@ p1
 ggsave(p1, file="figures/combined_data_availability_heatmap.jpeg", width = 8, height = 6)
 
 
-dhs_indicators_wide <- read_excel(here("landscape data/Landscape data sources/Landscape_data source_DHS_2024-04-09.xlsx"), sheet=2) %>%
+dhs_indicators_wide <- read_excel(here("Landscape data sources/Landscape_data source_DHS_2024-04-09.xlsx"), sheet=2) %>%
   rename(Country = Economy)
 unique(dhs_indicators_wide$Year)
 
@@ -225,3 +226,29 @@ p3
 
 ggsave(p3, file=here("figures/dhs_indicator_availability_heatmap.jpeg"), width = 5, height = 8)
 
+
+
+
+#updated format
+# Summarize the data by Country and Source over the selected period
+# Summarize the data by Country and Source over the selected period
+survey_summary <- final_data %>%
+  filter(Year >= 2010) %>%
+  group_by(Country, Source) %>%
+  summarize(n_surveys = sum(Available),
+            recent_year = ifelse(n_surveys > 0, max(Year[Available == 1]), NA)) %>%
+  ungroup()
+
+# Create the bubble chart with text labels for the most recent year
+ggplot(survey_summary, aes(x = Source, y = Country)) +
+  geom_point(aes(size = n_surveys, fill = recent_year),
+             shape = 21, color = "black") +
+  geom_text(aes(label = ifelse(n_surveys > 0, recent_year, "")),
+            color = "grey20", size = 3, fontface = "bold") +
+  scale_size_continuous(range = c(3, 12)) +
+  scale_fill_gradient(low = "blue", high = "lightblue",
+                      na.value = "grey", name = "Most Recent Survey") +
+  theme_minimal() +
+  labs(title = "Survey Count and Recency by Data Source and Country",
+       x = "Data Source", y = "Country") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
