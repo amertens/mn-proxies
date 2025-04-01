@@ -36,6 +36,17 @@ data(surveyPrevIndicators)
 head(surveyPrevIndicators)
 indicator_vec <- surveyPrevIndicators$ID
 
+#built in indicators
+data(surveyPrevIndicators)
+head(surveyPrevIndicators)
+indicator_vec <- surveyPrevIndicators$ID
+
+# Get all countries with women's anemia data
+# resp <- dhs_data(indicatorIds = "AN_ANEM_W_ANY", surveyYearStart = 2010,breakdown = "national")
+# resp=resp %>% group_by(CountryName) %>% arrange(desc(SurveyYear)) %>% slice(1)
+# write.csv(resp, file=paste0(here(),"/metadata/DHS_countries_with_anemia_data.csv"))
+
+
 #set up DHS download
 # #sctXX5E87xJbD*
 set_rdhs_config(email = "amertens@berkeley.edu",
@@ -107,7 +118,24 @@ country_vec = c("Cameroon", "Ethiopia", "Kenya",
                 "Zambia", "Zimbabwe", "Burundi", "Burkina Faso",
                  "Guyana",  "Madagascar","Rwanda",
                 "Morocco")
+
+country_vec = c("Mozambique",
+                "Sierra Leone", "United Republic of Tanzania", "Uganda",
+                "Zambia", "Zimbabwe", "Burundi", "Burkina Faso",
+                "Guyana",  "Madagascar","Rwanda",
+                "Morocco")
 surveyyear_vec=2024:2010
+
+
+# indicator_vec <- c("ancvisit4+", "RH_ANCN_W_N4P", "womananemia",
+#                    "AN_ANEM_W_ANY", "unmet_family", "FP_NADA_W_UNT", "FP_CUSA_W_MOD",
+#                    "AN_NUTS_W_THN","CN_ANMC_C_ANY", "CN_NUTS_C_WH2",
+#                    "wasting", "CN_NUTS_C_HA2", "stunting", "ML_PMAL_C_RDT",
+#                    "WS_TLET_H_IMP", "WS_TLET_P_BAS", "WS_SRCE_P_BAS","CH_DIAT_C_ORT", "DPT3", "CH_VACC_C_DP3",
+#                    "CH_VACC_C_DP1", "CH_VACC_C_BAS", "CH_VACC_C_NON", "CN_BRFS_C_EXB",
+#                    "CH_VACC_C_MSL", "PCV3", "RotaC1","RH_DELA_C_SKP", "CM_ECMR_C_NNR", "nmr","ML_NETP_H_IT2","HA_HIVP_B_HIV")
+# country_vec = c( "Kenya", "Ghana", "Gambia")
+# surveyyear_vec=2008
 
 
 # i = "Kenya"
@@ -156,10 +184,14 @@ for(i in country_vec){
           d$year=j
 
           d <- list(d)
-          names(d) <- paste0(i,"_",j)
+          obj_name <- paste0(i,"_",j)
+          names(d) <- obj_name
+          file_path <- paste0(here(),"/data/DHS/dhs_", obj_name, ".RDS")
+          saveRDS(d, file=file_path)
 
-          dhs_compiled_d <- c(dhs_compiled_d, d)
-          saveRDS(dhs_compiled_d, here("data/DHS_compiled_raw_data_interim.rds"))
+
+          # dhs_compiled_d <- c(dhs_compiled_d,d)
+          # saveRDS(dhs_compiled_d, here("data/DHS_compiled_raw_data_interim.rds"))
         }
 
         for(k in indicator_vec){
@@ -218,14 +250,12 @@ for(i in country_vec){
   }
 }
 head(fullres)
+table(dhs_indicators_d$indicator)
+table(dhs_indicators_d$country)
 
 saveRDS(fullres, here("data/DHS_national_indicator_prevalences.rds"))
-saveRDS(dhs_compiled_d, here("data/DHS_compiled_raw_data.rds"))
+#saveRDS(dhs_compiled_d, here("data/DHS_compiled_raw_data.rds"))
 saveRDS(dhs_indicators_d, here("data/DHS_compiled_indicator_data.rds"))
 saveRDS(geo_d, here("data/DHS_compiled_gps_data.rds"))
 
 
-
-fullres <- readRDS(here("data/DHS_national_indicator_prevalences_interim.rds"))
-dim(fullres)
-unique(fullres$country)

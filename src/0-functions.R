@@ -1,4 +1,12 @@
 
+
+makeVlist <- function(dta) {
+  labels <- sapply(dta, function(x) attr(x, "label"))
+  tibble(name = names(labels),
+         label = as.character(labels))
+}
+
+
 #fix getDHSdata functions to correctly select the country instead of all countries
 getDHSdata <- function(country, indicator = NULL, Recode = NULL, year){
   IR_Individual <- c("ancvisit4+", "RH_ANCN_W_N4P", "womananemia",
