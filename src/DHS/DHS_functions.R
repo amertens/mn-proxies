@@ -3,7 +3,7 @@
 # whose variable NAME or LABEL matches *any* of the given regex patterns.
 find_var_by_label <- function(df, patterns) {
   # Build a lookup of var name => label
-  var_labels <- map(df, ~ attr(.x, "label"))
+  var_labels <- purrr::map(df, ~ attr(.x, "label"))
   var_info <- tibble(
     old_name = names(var_labels),
     label    = unlist(var_labels)

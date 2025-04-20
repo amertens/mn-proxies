@@ -7,6 +7,39 @@ makeVlist <- function(dta) {
 }
 
 
+clean_DHS <- function(dfull){
+  HR_clean <- clean_HR(dfull$HRdata)
+  PR_clean <- clean_PR(dfull$PRdata)
+
+  # Merge household data into the PR data:
+  PR_merged <- PR_clean %>%
+    left_join(HR_clean, by = c("cluster","hh"))
+
+  IR_clean <- clean_IR(dfull$IRdata)
+
+  # Merge IR (women’s) data into PR_merged for female lines:
+  PR_IR_merged <- PR_merged %>%
+    left_join(IR_clean, by = c("cluster","hh","line"))
+  head(PR_IR_merged)
+
+  table(PR_IR_merged$anemia_cat)
+
+  d <- PR_IR_merged %>%
+    mutate(mod_sev_anemia=case_when(anemia_cat==1 | anemia_cat==2 ~ 1,
+                                    anemia_cat==3 | anemia_cat==4~ 0,
+                                    TRUE ~ NA)) %>%
+    filter(!is.na(mod_sev_anemia))
+
+  if(nrow(d)==0){
+    cat("No anemia data\n")
+  }else{
+    return(d)
+  }
+
+}
+
+
+
 #fix getDHSdata functions to correctly select the country instead of all countries
 getDHSdata <- function(country, indicator = NULL, Recode = NULL, year){
   IR_Individual <- c("ancvisit4+", "RH_ANCN_W_N4P", "womananemia",

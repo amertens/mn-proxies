@@ -119,9 +119,7 @@ country_vec = c("Cameroon", "Ethiopia", "Kenya",
                  "Guyana",  "Madagascar","Rwanda",
                 "Morocco")
 
-country_vec = c("Mozambique",
-                "Sierra Leone", "United Republic of Tanzania", "Uganda",
-                "Zambia", "Zimbabwe", "Burundi", "Burkina Faso",
+country_vec = c( "Zimbabwe", "Burundi", "Burkina Faso",
                 "Guyana",  "Madagascar","Rwanda",
                 "Morocco")
 surveyyear_vec=2024:2010
@@ -147,8 +145,8 @@ surveyyear_vec=2024:2010
 # # Error in onestrat(x[index, , drop = FALSE], clusters[index], nPSU[index][1],  :
 # #   Stratum (North East urban) has only one PSU at stage 1
 #
-# surveyyear_vec=2008
-# country_vec= c("Kenya", "Ghana")
+ # surveyyear_vec=2022
+ # country_vec= c("Ghana")
 # indicator_vec <- c( "womananemia")
 
 
@@ -164,7 +162,6 @@ for(i in country_vec){
       geo$country<-i
       geo$year<-j
       geo_d <- bind_rows(geo_d,geo)
-      saveRDS(geo_d, here("data/DHS_compiled_gps_data_interim.rds"))
 
       poly.adm1 <- geodata::gadm(country=i, level=1, path=tempdir())
       poly.adm1 <- sf::st_as_sf(poly.adm1)
@@ -256,6 +253,5 @@ table(dhs_indicators_d$country)
 saveRDS(fullres, here("data/DHS_national_indicator_prevalences.rds"))
 #saveRDS(dhs_compiled_d, here("data/DHS_compiled_raw_data.rds"))
 saveRDS(dhs_indicators_d, here("data/DHS_compiled_indicator_data.rds"))
-saveRDS(geo_d, here("data/DHS_compiled_gps_data.rds"))
 
 

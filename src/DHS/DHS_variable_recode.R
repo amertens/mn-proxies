@@ -6,6 +6,7 @@ hr_rename_spec <- list(
   # IDs
   cluster         = c("^hv001$", "cluster"),
   hh              = c("^hv002$", "household.*number"),
+  svy_weight      = c("^hv005$", "household sample weight (6 decimals)"),
 
   # Geographic and basic
   region          = c("^hv024$", "region"),

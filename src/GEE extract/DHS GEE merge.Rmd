@@ -1,0 +1,226 @@
+---
+title: "DHS GEE Merge"
+output: html_document
+date: "2025-04-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(tableone, readxl, dplyr, knitr, haven, terra, sf, stringr, ggplot2, janitor, geosphere, purrr, readr)
+```
+
+
+```{r}
+DHS <- readRDS("DHS_compiled_gps_data.rds")
+head(DHS)
+
+# see which countries to pull from, thought about pulling from the global data but that might be too large and cause issues down the line, also want to make code shell to be able to plug in any country or year of interest 
+unique(DHS$country)
+# check the years
+table(DHS$year, DHS$DHSYEAR)
+
+#check what years are for Ghana
+table(DHS$year, DHS$country)
+```
+
+```{r}
+### Test code using 2018 raster files for precip, NVDI, temp and 2019 DHS Data -- years obviously don't match, for test purposes only. 
+DHS_gambia <- DHS %>%
+  dplyr::filter(country == "Gambia")
+
+#raster data for test
+GM_precip_2018 <- rast("Gambia_2018_Daily_Avg_Precip.tif")
+GM_ndvi_2018 <- rast("Gambia_2018_Average_NDVI.tif")
+GM_temp_2018 <- rast("Gambia_2018_Daily_Avg_Temp.tif")
+
+#convert tabular data to spatial vector
+DHS_gambia_pts <- vect(DHS_gambia)
+crs(DHS_gambia_pts) <- crs(GM_precip_2018)
+
+#create buffers
+buff_5k <- buffer(DHS_gambia_pts, width = 5000)
+
+#get mean within each buffer
+precip_vals <- extract(GM_precip_2018, buff_5k, fun = mean, na.rm = TRUE)[,2]
+ndvi_vals   <- extract(GM_ndvi_2018, buff_5k, fun = mean, na.rm = TRUE)[,2]
+temp_vals   <- extract(GM_temp_2018, buff_5k, fun = mean, na.rm = TRUE)[,2]
+
+#combine buffer values with original data
+results_gm2018 <- as.data.frame(DHS_gambia_pts) %>%
+  mutate(mean_precip = precip_vals,
+         mean_ndvi   = ndvi_vals,
+         mean_temp   = temp_vals)
+```
+
+```{r}
+
+extract_rasters_by_year_country <- function(source_df, raster_dir, buffer_km = 10) {
+  # Convert to sf object
+  source_sf <- st_as_sf(source_df, coords = c("longnum", "latnum"), crs = 4326, remove = FALSE)
+
+  # Get unique year-country pairs
+  combos <- unique(source_sf[, c("year", "country")])
+
+  results <- list()
+
+  for (i in 1:nrow(combos)) {
+    yr <- combos$year[i]
+    ctry <- combos$country[i]
+
+    message("Processing ", ctry, " - ", yr)
+
+    # Filter data
+    data_subset <- source_sf %>% filter(year == yr, country == ctry)
+
+    # File paths
+    trmm_file <- file.path(raster_dir, paste0("TRMM_", ctry, "_", yr, ".tif"))
+    pop_file  <- file.path(raster_dir, paste0("PopDensity_", ctry, "_", yr, ".tif"))
+
+    # Check existence
+    if (!file.exists(trmm_file)) warning("Missing TRMM: ", trmm_file)
+    if (!file.exists(pop_file))  warning("Missing Pop: ", pop_file)
+    if (!file.exists(trmm_file) || !file.exists(pop_file)) next
+
+    # Load rasters
+    trmm <- rast(trmm_file)
+    pop  <- rast(pop_file)
+
+    # Transform points to projected CRS for buffering
+    projected_crs <- 8857
+    pts_proj <- st_transform(data_subset, crs = projected_crs)
+
+    # Create buffer
+    buf <- st_buffer(pts_proj, dist = buffer_km * 1000)
+    buf <- st_transform(buf, crs = crs(trmm))
+
+    # Extract raster values (mean)
+    trmm_vals <- terra::extract(trmm, vect(buf), fun = mean, na.rm = TRUE)
+    pop_vals  <- terra::extract(pop, vect(buf), fun = mean, na.rm = TRUE)
+
+    # Bind to original data
+    out <- data_subset
+    out$trmm_mean <- trmm_vals[, 2]
+    out$pop_mean  <- pop_vals[, 2]
+
+    results[[paste(ctry, yr, sep = "_")]] <- out
+  }
+
+  # Combine all
+  do.call(rbind, results)
+}
+
+```
+
+
+```{r}
+#check raster files
+check_trmm <- rast("~/Desktop/GEE docs/drive-download-20250419T073926Z-001/TRMM_Ghana_2010.tif")
+check_pop <- rast("~/Desktop/GEE docs/drive-download-20250419T073926Z-001/PopDensity_Ghana_2010.tif")
+# See the raster's info
+plot(check_trmm)
+summary(check_trmm)
+
+plot(check_pop)
+summary(check_pop)
+
+#check crs of DHS
+st_crs(DHS)
+
+#check crs of pop and trmm
+st_crs(check_pop)
+```
+
+```{r}
+#subset just to Ghana for running function to grab downloaded raster data
+DHS_ghana <- DHS %>%
+  filter(country == "Ghana")
+
+merged_data <- extract_rasters_by_year_country(
+  source_df = DHS_ghana,
+  raster_dir = "~/Desktop/GEE docs/drive-download-20250419T073926Z-001",
+  buffer_km = 10
+)
+
+merged_data_25_a <- extract_rasters_by_year_country(
+  source_df = DHS_ghana,
+  raster_dir = "~/Desktop/GEE docs/drive-download-20250419T073926Z-001",
+  buffer_km = 25
+)
+
+merged_data_25 <- extract_rasters_by_year_country(
+  source_df = DHS_ghana,
+  raster_dir = "~/Desktop/GEE docs/drive-download-20250419T073926Z-001",
+  buffer_km = 50
+)
+```
+
+```{r}
+#Merge in 25km and 50km buffer data with 10km buffered data
+#rename data sets, change variable names
+merged_data_10km <- merged_data %>%
+  rename(pop_mean_10km = pop_mean,
+         trmm_mean_10km = trmm_mean)
+merged_data_25km <- merged_data_25_a %>%
+  rename(pop_mean_25km = pop_mean,
+         trmm_mean_25km = trmm_mean)
+merged_data_50km <- merged_data_25 %>%
+  rename(pop_mean_50km = pop_mean,
+         trmm_mean_50km = trmm_mean)
+
+#subset 25km and 50km datasets to keep only DHSID and pop and trmm mean values, then merge with 10km dataset to get combined file
+
+subset_25km <- merged_data_25km %>%
+  st_drop_geometry() %>%
+  select(DHSID, pop_mean_25km,trmm_mean_25km)
+
+subset_50km <- merged_data_50km %>%
+  st_drop_geometry() %>%
+  select(DHSID, pop_mean_50km, trmm_mean_50km)
+
+DHS_gee_merge_GH <- merged_data_10km %>%
+  left_join(subset_25km, by = "DHSID") %>%
+  left_join(subset_50km, by = "DHSID")
+```
+
+
+```{r}
+#add in data from markets, calculate distance to nearest market, merge into final data set
+
+market_data <- read_csv("~/Desktop/GEE docs/wfp_food_prices_gha.csv")
+head(market_data)
+
+#subset to keep: market name, lat, long. Also only keep one row from long format
+markets_subset <- market_data[-1,] %>% #drop top row, variable description
+  group_by(market) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(market, latitude, longitude)
+
+# Convert to sf
+DHS_sf <- st_as_sf(DHS_gee_merge_GH, coords = c("longnum", "latnum"), crs = 4326)
+markets_sf <- st_as_sf(markets_subset, coords = c("longitude", "latitude"), crs = 4326)
+st_geometry(DHS_sf)
+
+# Project to meters for accurate distance, drop z coordinate first
+DHS_sf <- st_zm(DHS_sf, drop = TRUE, what = "ZM")
+DHS_proj <- st_transform(DHS_sf, 3857)  # Web Mercator
+markets_proj <- st_transform(markets_sf, 3857)
+
+# Distance matrix: rows = original points, columns = markets
+dist_matrix <- st_distance(DHS_proj, markets_proj)
+
+# Get the minimum distance and index of nearest market
+nearest_dist <- apply(dist_matrix, 1, min)
+nearest_market_index <- apply(dist_matrix, 1, which.min)
+
+# Add the results to your original data
+DHS_gee_merge_GH$nearest_market_distance_km <- nearest_dist / 1000  # convert to km
+DHS_gee_merge_GH$nearest_market_id <- markets_subset$market[nearest_market_index]
+
+#print final dataset with buffers and distance measures added
+
+#DHS_gee_merge_GH <- st_drop_geometry(DHS_sf) -- didn't do this, lost the distance measures. 
+write.csv(DHS_gee_merge_GH, "DHS_GEE_merge_GH.csv", row.names = FALSE)
+
+
+```

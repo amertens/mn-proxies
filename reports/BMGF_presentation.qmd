@@ -1,0 +1,135 @@
+---
+title: "Proxy Micronutrient Deficiency Prediction Project: Progress Update"
+subtitle: "Phase 1–2 status"
+author: "Andrew N. Mertens, UC Berkeley"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    incremental: true
+    footer: "Micronutrient Data Innovation Alliance"
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+- Aim: Develop models to estimate global, national and sub‑national prevalence of micronutrient deficiencies using proxy indicators  
+- Current focus micronutrients: **iron, vitamin A, zinc, iodine, folate**  
+- Phases  
+  1. Conceptual frameworks + data landscape  
+  2. Proof‑of‑concept model development (West Africa)  
+  3. Expansion (contingent on Phase 2 success)
+
+# Milestones
+
+| Deliverable | Target | Status |
+|-------------|--------|--------|
+| Scientific Advisory Board | Feb 2024 | ✅ established |
+| Draft analysis plan | Mar 2024 | ✅ complete |
+| Conceptual frameworks (4 MN) | Apr 2024 | ✅ drafts reviewed |
+| Landscaping analysis | Apr 2024 | **🟢 near final** |
+| Compiled datasets (2 data‑rich) | Dec 2024 | 🟡 in progress |
+| Compiled datasets (3‑4 constrained) | Jun 2025 | ⏳ not started |
+
+# Data landscape snapshot
+
+```{r fig-landscape-type1, eval=FALSE}
+# TODO: Insert code to read `data_landscape_type1.csv`
+# and plot availability heatmap (Figure 1 placeholder)
+```
+
+<aside class="notes">
+Figure 1 placeholder for Type 1 coverage by country‑year. See Manus_data sources landscape_2025 draft.
+</aside>
+
+# Micronutrient survey coverage
+
+```{r fig-dhs-domains, eval=FALSE}
+# TODO: Plot DHS indicator domain coverage (Figure 2 placeholder)
+```
+
+# Predictor data aggregation workflow
+
+```{r setup-packages}
+# load core packages
+library(tidyverse)
+library(sf)
+library(terra)
+library(SuperLearner)
+# source utility functions
+source("R/dhs_surface.R")
+```
+
+<div class="fragment">
+Steps  
+1. Import **national surveys** (DHS/MICS, BRINDA, HCES)  
+2. Join **annual modeled series** (IHME, FAO SUA/FBS, JMP WASH)  
+3. Rasterize and aggregate **remote‑sensed covariates** (MAP, GEE climate)  
+4. Harmonize spatial units → **Admin 1** reference  
+5. Output analysis‑ready panel (`mn_predictor_panel.parquet`)
+</div>
+
+# Example: Predicting anemia in Ghana
+
+```{r anemia-workflow, eval=FALSE}
+# Placeholder for anemia prediction code:
+# 1. fit SuperLearner
+# 2. cross-validated performance metrics
+```
+
+# Performance summary
+
+```{r perf-table, eval=FALSE}
+# TODO: knitr::kable(placeholder_table, caption = "Model performance comparison")
+```
+
+# Variable importance
+
+```{r vip-plot, eval=FALSE}
+# TODO: ggplot variable importance bars grouped by domain
+```
+
+# Prediction map (Admin 1)
+
+```{r pred-map, eval=FALSE}
+# TODO: plot predicted anemia prevalence with terra::plot
+```
+
+# Uncertainty quantification
+
+```{r ci-plot, eval=FALSE}
+# TODO: placeholder for bootstrap CI ribbon plot
+```
+
+# Budget & resource allocation
+
+- UCB subaward total: **$321,067** across two years  
+- Year 1 direct costs: $143,176, IDC 10%  
+- Personnel: PI (Hubbard 7%), Co‑PI (Mertens 25%), GSR 50%, UG assistant 15 h/wk
+
+# Next steps
+
+1. Finalize data landscape manuscript & submit (Journal of Global Health?)  
+2. Complete Ghana & Nigeria predictor panels  
+3. Launch modeler consortium > July 2025  
+4. Develop interactive dashboard (Shiny + leaflet)  
+5. Prepare Phase 2 funding report to Gates Foundation
+
+# Discussion & feedback
+
+- Are the predictor domains comprehensive?  
+- Preferred visualization of uncertainty?  
+- Suggestions for stakeholder engagement?
+
+---
+
+# Appendix
+
+## Session info
+
+```{r session-info}
+sessionInfo()

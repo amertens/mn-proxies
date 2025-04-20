@@ -49,75 +49,75 @@ Xvars= c("sex", "age", "rel_to_head", "edu_level.x",
          "dv_injury", "hiv_time_test", "hiv_place_test")
 
 
-clean_DHS <- function(dfull){
-  HR_clean <- clean_HR(dfull$HRdata)
-  PR_clean <- clean_PR(dfull$PRdata)
 
-  # Merge household data into the PR data:
-  PR_merged <- PR_clean %>%
-    left_join(HR_clean, by = c("cluster","hh"))
+filenames <- paste0("dhs_",DHS_anemia_countries$CountryName, " ",DHS_anemia_countries$SurveyYear,".RDS") %>% gsub(" ","_",.)
+raw_data_list <- list()
+for(i in filenames){
+  try(raw_data_list[[i]] <- readRDS(here("data/DHS/",i)))[[1]]
+}
+names(raw_data_list)
 
-  IR_clean <- clean_IR(dfull$IRdata)
 
-  # Merge IR (women’s) data into PR_merged for female lines:
-  PR_IR_merged <- PR_merged %>%
-    left_join(IR_clean, by = c("cluster","hh","line"))
-  head(PR_IR_merged)
+clean_data_list <- list()
+for(i in 1:length(raw_data_list)){
+  clean_data_list[[i]] <- clean_DHS(raw_data_list[[i]][[1]])
+  names(clean_data_list)[i] <- names(raw_data_list)[i]
+}
+names(clean_data_list) <- gsub("dhs_","",names(clean_data_list))
+names(clean_data_list) <- gsub(".RDS","",names(clean_data_list))
+names(clean_data_list) <- gsub("_"," ",names(clean_data_list))
+names(clean_data_list)
 
-  table(PR_IR_merged$anemia_cat)
+SL_res <- list()
+for(i in 1:length(clean_data_list)){
+  res=try(DHS_SL(d=clean_data_list[[i]], Xvars=Xvars))
+  SL_res[[i]] = res
+  names(SL_res)[i] <- names(clean_data_list)[i]
 
-  d <- PR_IR_merged %>%
-    mutate(mod_sev_anemia=case_when(anemia_cat==1 | anemia_cat==2 ~ 1,
-                                    anemia_cat==3 | anemia_cat==4~ 0,
-                                    TRUE ~ NA)) %>%
-    filter(!is.na(mod_sev_anemia))
+}
+names(SL_res)
+saveRDS(SL_res, file=here("results/DHS_SL_res.rds"))
 
-  if(nrow(d)==0){
-    cat("No anemia data\n")
-  }else{
-    return(d)
+SL_cv_MSE <- NULL
+for(i in 1:length(SL_res)){
+  if(!inherits(SL_res[[i]], "try-error")){
+    res=data.frame(SL_res[[i]]$cv_risk_w_sl_revere)
+    res$survey=names(SL_res)[i]
+    SL_cv_MSE= try(bind_rows(SL_cv_MSE,res))
   }
+}
 
+calc_importance <- function(sl_fit){
+  set.seed(983)
+  varimp <- importance(
+    fit = sl_fit,
+    #eval_fun = loss_squared_error,
+    eval_fun = loss_loglik_binomial,
+    type = "permute",
+    importance_metric="ratio"
+  )
+
+  varimp20=varimp %>% arrange(NLL_ratio) %>% tail(n=20)
+  p=importance_plot(x = varimp20)
+  return(list(varimp=varimp, varimp20=varimp20, p=p))
 }
 
 
-
-#dfull <- readRDS(here("data/DHS/dhs_Ethiopia_2019.RDS"))
-#dfull <- readRDS(here("data/DHS/dhs_Cameroon_2022.RDS"))
-dfull <- readRDS(here("data/DHS/dhs_Cameroon_2018.RDS"))
-dfull <-dfull[[1]]
-temp <- dfull$PRdata
-vTemp = makeVlist(temp)
-vTemp$name[grepl("anemia", vTemp$label)]
-vTemp$label[grepl("anemia", vTemp$label)]
-summary(temp$ha57)
-summary(temp$ha58)
-summary(temp$hc57)
-summary(temp$hc58)
-
-d <- clean_DHS(dfull)
-head(d)
+SL_res <- readRDS(here("results/DHS_SL_res.rds"))
 
 
+varimp_list <- list()
+for(i in 1:length(SL_res)){
+  res=NULL
+  res=try(calc_importance(SL_res[[i]]$sl_fit))
+
+  if(!inherits(res, "try-error")){
+    varimp_list[[i]] <- res
+    names(varimp_list)[i] <- names(SL_res)[i]
+  }
+}
 
 
-
-
-res=DHS_SL(d=d, Xvars=Xvars)
-
-
-#NOTE! Takes a long time with a large number of covariates
-set.seed(983)
-varimp <- importance(
-  fit = res$sl_fit,
-  eval_fun = loss_squared_error,
-  #eval_fun = loss_loglik_binomial,
-  type = "permute",
-  importance_metric="ratio"
-)
-
-varimp20=varimp %>% arrange(MSE_difference) %>% tail(n=20)
-importance_plot(x = varimp20)
 
 
 

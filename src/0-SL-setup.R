@@ -1,5 +1,7 @@
 
 
+
+
 #Set up SL components
 lrnr_mean <- make_learner(Lrnr_mean)
 lrnr_glmnet <- Lrnr_glmnet$new()
@@ -35,24 +37,24 @@ stack <- make_learner(
   #screened_hal
 )
 
-stack <- make_learner(
-  Stack,
-  lrnr_mean,
-  lrnr_glmnet
-)
+# stack <- make_learner(
+#   Stack,
+#   lrnr_mean,
+#   lrnr_glmnet
+# )
 
 metalearner <- make_learner(Lrnr_nnls)
 
 sl <- make_learner(Lrnr_sl,
                    learners = stack,
-                   #loss_function = loss_loglik_binomial,
+                   loss_function = loss_loglik_binomial,
                    metalearner = metalearner
 )
 slmod=sl
 
 
 
-DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F){
+DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F, sl=sl){
   X = d %>% select(!!Xvars) %>% as.data.frame()
   cov=unlabelled(X, user_na_to_na = TRUE)
   Y = d[[outcome]]
@@ -109,3 +111,184 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F){
 
   return(list(sl_fit=sl_fit, yhat_full=yhat_full,cv_risk_w_sl_revere=cv_risk_w_sl_revere))
 }
+
+
+
+
+
+
+
+
+
+
+
+# =============================================================
+#  DHS_cluster_SL(): SuperLearner with cluster‑indexed CV
+#  ------------------------------------------------------------
+#  • Uses the same learner stack (object `slmod`) you already set up
+#  • Adds survey weights (if available)            –>  representative predictions
+#  • Aggregates individual predictions to clusters –>  prevalence
+# =============================================================
+DHS_cluster_SL <- function(d,
+                           Xvars,
+                           outcome      = "mod_sev_anemia",
+                           cluster_var  = "cluster",
+                           weight_var   = NULL,          # e.g. "wt" once you add it
+                           V            = 10,
+                           sl           = slmod) {
+
+  # ---------- 1. outcome, covariates, weights ---------------------------------
+  Y      <- d[[outcome]]
+  X = d %>% select(!!Xvars) %>% as.data.frame()
+  cov=unlabelled(X, user_na_to_na = TRUE)
+
+  cov <- cov %>%
+    do(impute_missing_values(., type = "standard", add_indicators = T, prefix = "missing_")$data) %>%
+    as.data.frame()
+
+  # drop near‑zero‑variance columns
+  nzv <- caret::nearZeroVar(cov)
+  if (length(nzv) > 0){
+    cov <- cov[ , -nzv]
+  }
+
+  # weights?
+  if (!is.null(weight_var)) {
+    wts <- d[[weight_var]]
+  } else {
+    wts <- rep(1, nrow(d))
+  }
+
+  # ---------- 2.  build sl3 task ----------------------------------------------
+  task <- sl3::sl3_Task$new(
+    data        = data.frame(Y = Y,cov,
+                                         cluster= d[[cluster_var]],
+                                         wt       = wts),
+    covariates  = names(cov),
+    outcome     = "Y",
+    id          = cluster_var,
+    weights     = "wt",
+    folds       = origami::make_folds(
+      cluster_ids = d[[cluster_var]],
+      V           = V
+    )
+  )
+
+  # ---------- 3.  fit ----------------------------------------------------------
+  set.seed(12345)
+  sl_fit <- sl$train(task)
+
+  # ---------- 4.  individual predictions & aggregation ------------------------
+  d$pred_prob <- sl_fit$predict()
+
+  cluster_prev <- d |>
+    dplyr::group_by(.data[[cluster_var]]) |>
+    dplyr::summarise(n_women   = dplyr::n(),
+                     obs_prev  = mean(.data[[outcome]], na.rm = TRUE),
+                     pred_prev = mean(pred_prob,        na.rm = TRUE),
+                     .groups   = "drop")
+
+  # return both
+  list(sl_fit       = sl_fit,
+       ind_pred     = dplyr::select(d, all_of(cluster_var), pred_prob),
+       cluster_pred = cluster_prev)
+}
+
+
+calc_importance <- function(sl_fit, eval.fun = loss_loglik_binomial, importance.metric="ratio", n_vars=20){
+  set.seed(983)
+  varimp <- importance(
+    fit = sl_fit,
+    eval_fun = eval.fun,
+    type = "permute",
+    importance_metric=importance.metric
+  )
+
+  varimp20=varimp %>% arrange(.[,2]) %>% tail(n=n_vars)
+  p=importance_plot(x = varimp20)
+  return(list(varimp=varimp, varimp20=varimp20, p=p))
+}
+
+
+# =============================================================
+#  SL_surface(): map a SuperLearner over a 5‑km grid
+#  -------------------------------------------------------------
+#  • sl_fit  = object returned by DHS_cluster_SL()
+#  • task    = the sl3_Task used to train the ensemble
+#  • cov_stack = terra SpatRaster of gridded predictors
+#  • ghana_admin0 = sf polygon mask for Ghana
+#  • res_km  = grid resolution
+#  • B       = # bootstrap replicates   (for SEs)
+# =============================================================
+sl_surface <- function(sl_fit, task, cov_stack,
+                       ghana_admin0, res_km = 5,
+                       B = 300, seed = 1) {
+
+  library(sf); library(terra); library(dplyr); library(future.apply)
+
+  ## 1.  5‑km grid -----------------------------------------------------------
+  grid_pts <- st_make_grid(ghana_admin0,
+                           cellsize = res_km / 111,
+                           what     = "centers") |>
+    st_as_sf() |>
+    st_intersection(ghana_admin0)
+
+  grid_df <- data.frame(st_coordinates(grid_pts))
+  names(grid_df) <- c("lon", "lat")
+
+  ## 2.  Extract raster covariates ------------------------------------------
+  if (!is.null(cov_stack)) {
+    cov_mat <- terra::extract(cov_stack, grid_df[, c("lon","lat")],
+                              bind = TRUE) |>
+      dplyr::select(-ID)
+  } else cov_mat <- data.frame()
+
+  # predictor names must match those in the training task
+  Xvars <- task$nodes$covariates
+  grid_cov <- cov_mat |>
+    dplyr::select(any_of(Xvars)) |>
+    mutate(across(where(is.factor), as.character))  # keep types
+
+  ## 3.  Base prediction -----------------------------------------------------
+  grid_task <- sl3::sl3_Task$new(data       = grid_cov,
+                                 covariates = Xvars,
+                                 outcome    = NULL)
+
+  grid_pred <- sl_fit$predict(grid_task)  # point estimate (vector)
+
+  ## 4.  Cluster‑bootstrap SE -----------------------------------------------
+  set.seed(seed)
+  clust_ids <- unique(task$data[[task$nodes$id]])
+  boot_mat  <- matrix(NA_real_, nrow = nrow(grid_cov), ncol = B)
+
+  plan(multisession)          # parallel if you like
+  boot_mat <- future_sapply(seq_len(B), \(b) {
+    samp <- sample(clust_ids, replace = TRUE)
+    d_b  <- task$data %>% dplyr::filter(.data[[task$nodes$id]] %in% samp)
+
+    task_b <- task$clone(deep = TRUE)
+    task_b$data <- d_b
+
+    fit_b  <- sl_fit$learner$train(task_b)        # re‑fit ensemble
+    fit_b$predict(grid_task)
+  })
+  plan(sequential)
+
+  grid_sd <- apply(boot_mat, 1, sd)
+
+  ## 5.  Rasterise -----------------------------------------------------------
+  r_template <- rast(extent = ext(range(grid_df$lon),
+                                  range(grid_df$lat)),
+                     resolution = res_km / 111,
+                     crs = "EPSG:4326")
+
+  r_mu <- rasterize(vect(cbind(grid_df, pred = grid_pred), crs = "EPSG:4326"),
+                    r_template, field = "pred", fun = "mean")
+
+  r_sd <- rasterize(vect(cbind(grid_df, sd = grid_sd),   crs = "EPSG:4326"),
+                    r_template, field = "sd", fun = "mean")
+
+  list(mean = r_mu, sd = r_sd, draws = boot_mat)
+}
+
+

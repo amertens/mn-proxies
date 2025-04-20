@@ -63,13 +63,11 @@ survey_summary <- plotdf %>%
   ungroup() %>% droplevels()
 head(survey_summary)
 
-ggplot(survey_summary, aes(y = Indicator, x = Country, fill=mean)) +
+ggplot(survey_summary %>% filter(Population=="Pregnant women"), aes(y = Indicator, x = Country, fill=mean)) +
   geom_point(aes(size = mean),
              shape = 21, color = "black") +
   # geom_text(aes(label = ifelse(n_surveys > 0, recent_year, "")),
-  #           color = "grey20"
-
-  , size = 3, fontface = "bold") +
+  #           color = "grey20"  , size = 3, fontface = "bold") +
   #scale_size_continuous(range = c(3, 12)) +
   scale_fill_gradient(low = "blue", high = "lightblue",
                       na.value = "grey", name = "Most Recent Survey") +
