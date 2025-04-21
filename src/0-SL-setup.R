@@ -54,10 +54,11 @@ slmod=sl
 
 
 
-DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F, sl=sl){
+DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", id="cluster", folds=5, CV=F, sl){
   X = d %>% select(!!Xvars) %>% as.data.frame()
   cov=unlabelled(X, user_na_to_na = TRUE)
   Y = d[[outcome]]
+  id = d[[id]]
 
   #impute missing and Drop near-zero variance predictors
   cov <- cov %>%
@@ -73,7 +74,7 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F, sl=sl){
 
   cov <- data.frame(cov)
   covars=colnames(cov)
-  dat <-cbind(Y,cov)
+  dat <-cbind(Y,id,cov)
   dat <- data.table(dat)
 
 
@@ -83,13 +84,13 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F, sl=sl){
     data = dat,
     covariates = covars,
     outcome = "Y",
-    #id="subjid",
-    folds = make_folds(dat, fold_fun = folds_vfold, V = folds)
+    id="id"#,
+    #folds = make_folds(dat, fold_fun = folds_vfold, V = folds)
   )
 
   #get cross validated fit
   if(CV){
-    suppressMessages(cv_sl <- make_learner(Lrnr_cv, slmod, full_fit = TRUE))
+    suppressMessages(cv_sl <- make_learner(Lrnr_cv, sl, full_fit = TRUE))
     #cv_glm <- make_learner(Lrnr_cv, glm_sl, full_fit = TRUE)
     suppressMessages(sl_fit <- cv_sl$train(SL_task))
     #glm_fit <- cv_glm$train(SL_task)
@@ -106,10 +107,10 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", folds=2, CV=F, sl=sl){
 
   #get outcome predictions
   yhat_full <- sl_fit$predict_fold(SL_task,"validation")
-  #yhat_glm <- glm_fit$predict_fold(SL_task,"validation")
 
 
-  return(list(sl_fit=sl_fit, yhat_full=yhat_full,cv_risk_w_sl_revere=cv_risk_w_sl_revere))
+  return(list(sl_fit=sl_fit, yhat_full=yhat_full,cv_risk_w_sl_revere=cv_risk_w_sl_revere,
+              Xvars=SL_task$column_names))
 }
 
 
@@ -135,7 +136,7 @@ DHS_cluster_SL <- function(d,
                            cluster_var  = "cluster",
                            weight_var   = NULL,          # e.g. "wt" once you add it
                            V            = 10,
-                           sl           = slmod) {
+                           sl) {
 
   # ---------- 1. outcome, covariates, weights ---------------------------------
   Y      <- d[[outcome]]
@@ -178,6 +179,7 @@ DHS_cluster_SL <- function(d,
   set.seed(12345)
   sl_fit <- sl$train(task)
 
+
   # ---------- 4.  individual predictions & aggregation ------------------------
   d$pred_prob <- sl_fit$predict()
 
@@ -188,20 +190,24 @@ DHS_cluster_SL <- function(d,
                      pred_prev = mean(pred_prob,        na.rm = TRUE),
                      .groups   = "drop")
 
-  # return both
+  # return both
   list(sl_fit       = sl_fit,
        ind_pred     = dplyr::select(d, all_of(cluster_var), pred_prob),
+       Xvars=task$column_names,
        cluster_pred = cluster_prev)
 }
 
 
-calc_importance <- function(sl_fit, eval.fun = loss_loglik_binomial, importance.metric="ratio", n_vars=20){
+calc_importance <- function(sl_fit, eval.fun = loss_loglik_binomial,
+                            importance.metric="ratio", n_vars=20,
+                            covariate.groups=NULL){
   set.seed(983)
   varimp <- importance(
     fit = sl_fit,
     eval_fun = eval.fun,
     type = "permute",
-    importance_metric=importance.metric
+    importance_metric=importance.metric,
+    covariate_groups = covariate.groups,
   )
 
   varimp20=varimp %>% arrange(.[,2]) %>% tail(n=n_vars)

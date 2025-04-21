@@ -195,6 +195,8 @@ dhs_prev_surface <- function(dat,                # cluster‑level tibble
        model = fit)
 }
 
+library(sf)
+library(terra)
 
 
 gha_v <- geodata::gadm(country="Ghana", level=0, path=tempdir())

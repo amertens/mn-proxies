@@ -176,3 +176,79 @@ pr_rename_spec <- list(
   # add them if you want a single wide file.
 
 )
+
+
+
+
+# Helper function to extract readable labels from rename specs
+extract_labels <- function(rename_spec, prefix = "") {
+  labels <- list()
+
+  for (new_name in names(rename_spec)) {
+    # Get the patterns associated with the variable
+    patterns <- rename_spec[[new_name]]
+
+    # If there are at least 2 elements and the second one isn't a regex pattern
+    if (length(patterns) >= 2 && !grepl("^\\^|\\$$", patterns[2])) {
+      # Use the second pattern (descriptive text) as the base for the label
+      label_text <- patterns[2]
+
+      # Clean up and capitalize the label
+      label_text <- gsub("\\|.*$", "", label_text)  # Remove pipe and anything after
+      label_text <- gsub("\\.", " ", label_text)    # Replace dots with spaces
+      label_text <- gsub("\\*", "", label_text)     # Remove asterisks
+
+      # Capitalize first letter
+      label_text <- paste0(toupper(substr(label_text, 1, 1)),
+                           substr(label_text, 2, nchar(label_text)))
+
+      # Shorten labels that are too long (more than 40 characters)
+      if (nchar(label_text) > 40) {
+        label_text <- paste0(substr(label_text, 1, 37), "...")
+      }
+    } else {
+      # If no descriptive pattern available, use the variable name as the label
+      label_text <- gsub("_", " ", new_name)
+      label_text <- paste0(toupper(substr(label_text, 1, 1)),
+                           substr(label_text, 2, nchar(label_text)))
+    }
+
+    # Add prefix if requested (to differentiate between datasets if needed)
+    if (prefix != "") {
+      var_name <- paste0(prefix, "_", new_name)
+    } else {
+      var_name <- new_name
+    }
+
+    # Store the label
+    labels[[var_name]] <- label_text
+  }
+
+  return(labels)
+}
+
+
+
+rename_vars_for_plotting <- function(var_names, labels_list) {
+  # Create a named vector to store the renamed variables
+  renamed_vars <- var_names
+  names(renamed_vars) <- var_names
+
+  # Iterate through each variable name
+  for (i in seq_along(var_names)) {
+    var_name <- var_names[i]
+
+    # Check if the variable exists in the labels list
+    if (var_name %in% names(labels_list)) {
+      # Replace with the human-readable label
+      renamed_vars[i] <- labels_list[[var_name]]
+    } else {
+      # Keep the original name, but make it more readable
+      clean_name <- gsub("_", " ", var_name)
+      renamed_vars[i] <- paste0(toupper(substr(clean_name, 1, 1)),
+                                substr(clean_name, 2, nchar(clean_name)))
+    }
+  }
+
+  return(renamed_vars)
+}

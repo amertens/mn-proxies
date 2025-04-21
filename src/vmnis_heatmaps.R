@@ -60,22 +60,101 @@ survey_summary <- plotdf %>%
   filter(Date == max(Date)) %>%
   summarize(n_surveys = n(),
             mean=mean(Mean,na.rm=T)) %>%
+  filter(!is.na(mean)) %>%
   ungroup() %>% droplevels()
 head(survey_summary)
 
-ggplot(survey_summary %>% filter(Population=="Pregnant women"), aes(y = Indicator, x = Country, fill=mean)) +
-  geom_point(aes(size = mean),
-             shape = 21, color = "black") +
-  # geom_text(aes(label = ifelse(n_surveys > 0, recent_year, "")),
-  #           color = "grey20"  , size = 3, fontface = "bold") +
-  #scale_size_continuous(range = c(3, 12)) +
-  scale_fill_gradient(low = "blue", high = "lightblue",
-                      na.value = "grey", name = "Most Recent Survey") +
-  theme_minimal() +
-  facet_wrap(~Population)+
-  labs(title = "Survey Count and Recency by Data Source and Country",
-       x = "Data Source", y = "Country") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#plotdf = survey_summary %>% filter(Population=="Pregnant women")
+write.csv(plotdf, here("data/VMNIS/vmnis_heatmap_data.csv"), row.names = F)
 
 
+  # ------------------------------------------------------------------
+  # 1.  Recode Indicator → mn_group  (broad micronutrient categories)
+  # ------------------------------------------------------------------
+mn_map <- function(x) {
+  case_when(
+    x %in% c("Ferritin", "Serum transferrin receptor",
+             "Iron (serum or plasma)", "Total iron binding capacity (TIBC)",
+             "Transferrin saturation", "Mean corpuscular volume (MCV)")        ~ "Iron",
+    x %in% c("Retinol (plasma or serum)", "Beta-carotene")                     ~ "Vitamin A",
+    x == "Zinc (plasma or serum)"                                              ~ "Zinc",
+    x %in% c("Goitre by ultrasound", "Iodine")                                 ~ "Iodine",
+    x %in% c("Folate (plasma or serum)", "Folate (red blood cell)")            ~ "Folate",
+    x == "Vitamin B12"                                                         ~ "Vitamin B12",
+    x == "25-Hydroxyvitamin D"                                                 ~ "Vitamin D",
+    x == "Vitamin E (alpha-tocopherol)"                                        ~ "Vitamin E",
+    x == "Vitamin C"                                                           ~ "Vitamin C",
+    x == "Haemoglobin"                                                         ~ "Haemoglobin",
+    TRUE                                                                       ~ NA_character_
+  )
+}
 
+plotdf <- d %>%
+  filter(
+    Representativeness == "national",
+    Areacovered        == "both urban and rural",
+    Country            %in% LMICs
+  ) %>%
+  mutate(
+    Population = case_when(
+      Population %in% c("Infants (1-11 months)", "Children (12-23 months)",
+                        "Neonates (0-28 days)",  "Young infants (0-5 months)",
+                        "Children (24-59 months)") ~ "Children <5",
+      TRUE ~ Population),
+    mn_group  = mn_map(Indicator)
+  ) %>%
+  drop_na(mn_group)                                            # toss very rare / misc. assays
+
+# ------------------------------------------------------------------
+# 2.  Keep the most‑recent survey per Country × Population × micronutrient
+# ------------------------------------------------------------------
+survey_summary <- plotdf %>%
+  group_by(Indicator  ) %>%
+  mutate(Mean=scale(Mean)) %>%
+  group_by(Country, Population, mn_group) %>%
+  filter(Date == max(Date)) %>%            # latest survey for that triad
+  summarise(
+    n_surveys = n(),
+    mean      = mean(Mean, na.rm = TRUE),  # or whatever statistic you prefer
+    .groups   = "drop"
+  ) %>%
+  filter(!is.na(mean))
+
+# ------------------------------------------------------------------
+# 3.  OPTIONAL: focus on one population
+# ------------------------------------------------------------------
+plotdf_pw <- survey_summary %>% filter(Population == "Pregnant women")
+
+# ------------------------------------------------------------------
+# 4.  Heat‑map style dot‑plot
+# ------------------------------------------------------------------
+p <- ggplot(plotdf_pw, aes(y = mn_group, x = Country, fill = mean)) +
+  geom_point(aes(size = n_surveys), shape = 21, colour = "black") +
+  scale_size_continuous(range = c(1, 6), name = "Number of surveys") +
+  coord_flip() +
+  scale_fill_gradient(low = "navy", high = "skyblue",
+                      na.value = "grey90", name = "Scaled mean (latest)") +
+  theme_minimal(base_size = 12) +
+  labs(title = "VMNIS data availability – Pregnant women",
+       subtitle = "Most recent national survey covering both urban & rural areas",
+       x = "Country", y = "Micronutrient (collapsed)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right")
+
+p_alt <- ggplot(plotdf_pw %>% filter(mn_group!="Haemoglobin") %>% droplevels(),
+       aes(y = mn_group, x = Country, fill = mean)) +
+  geom_point(aes(size = n_surveys), shape = 21, colour = "black") +
+  scale_size_continuous(range = c(1, 6), name = "Number of surveys") +
+  coord_flip() +
+  scale_fill_gradient(low = "navy", high = "skyblue",
+                      na.value = "grey90", name = "Scaled mean (latest)") +
+  theme_minimal(base_size = 12) +
+  labs(title = "VMNIS data availability – Pregnant women",
+       subtitle = "Most recent national survey covering both urban & rural areas",
+       x = "Country", y = "Micronutrient (collapsed)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right")
+
+#save plot objects
+ggsave(here("figures/VMNIS_heatmap_pw.png"), p, width = 10, height = 8)
+ggsave(here("figures/VMNIS_heatmap_pw_alt.png"), p_alt, width = 10, height = 8)

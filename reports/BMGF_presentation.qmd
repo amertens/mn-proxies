@@ -1,6 +1,5 @@
 ---
 title: "Proxy Micronutrient Deficiency Prediction Project: Progress Update"
-subtitle: "Phase 1–2 status"
 author: "Andrew N. Mertens, UC Berkeley"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 format:
@@ -8,7 +7,8 @@ format:
     theme: simple
     slide-number: true
     incremental: true
-    footer: "Micronutrient Data Innovation Alliance"
+  pptx:
+    slide-level: 2
 execute:
   echo: true
   warning: false
@@ -18,38 +18,53 @@ execute:
 # Overview
 
 - Aim: Develop models to estimate global, national and sub‑national prevalence of micronutrient deficiencies using proxy indicators  
-- Current focus micronutrients: **iron, vitamin A, zinc, iodine, folate**  
+- Current focus micronutrients: **iron, vitamin A, zinc, iodine, folate**  
+- Predicting Anemia from DHS data until access to IPD micronutrient data is available
 - Phases  
   1. Conceptual frameworks + data landscape  
   2. Proof‑of‑concept model development (West Africa)  
-  3. Expansion (contingent on Phase 2 success)
+  3. Expansion (contingent on Phase   success)
 
-# Milestones
+<!-- # Milestones -->
 
-| Deliverable | Target | Status |
-|-------------|--------|--------|
-| Scientific Advisory Board | Feb 2024 | ✅ established |
-| Draft analysis plan | Mar 2024 | ✅ complete |
-| Conceptual frameworks (4 MN) | Apr 2024 | ✅ drafts reviewed |
-| Landscaping analysis | Apr 2024 | **🟢 near final** |
-| Compiled datasets (2 data‑rich) | Dec 2024 | 🟡 in progress |
-| Compiled datasets (3‑4 constrained) | Jun 2025 | ⏳ not started |
+<!-- | Deliverable | Target | Status | -->
+<!-- |-------------|--------|--------| -->
+<!-- | Scientific Advisory Board | Feb 2024 | ✅ established | -->
+<!-- | Draft analysis plan | Mar 2024 | ✅ complete | -->
+<!-- | Conceptual frameworks (4 MN) | Apr 2024 | ✅ drafts reviewed | -->
+<!-- | Landscaping analysis | Apr 2024 | **🟢 near final** | -->
+<!-- | Compiled datasets (2 data‑rich) | Dec 2024 | 🟡 in progress | -->
+<!-- | Compiled datasets (3‑4 constrained) | Jun 2025 | ⏳ not started | -->
 
-# Data landscape snapshot
+<!-- # Data landscape snapshot -->
 
-```{r fig-landscape-type1, eval=FALSE}
-# TODO: Insert code to read `data_landscape_type1.csv`
-# and plot availability heatmap (Figure 1 placeholder)
+<!-- ```{r fig-landscape-type1, eval=FALSE} -->
+<!-- # TODO: Insert code to read `data_landscape_type1.csv` -->
+<!-- # and plot availability heatmap (Figure 1 placeholder) -->
+<!-- ``` -->
+
+<!-- <aside class="notes"> -->
+<!-- Figure 1 placeholder for Type 1 coverage by country‑year. See Manus_data sources landscape_2025 draft. -->
+<!-- </aside> -->
+
+# VMNIS Micronutrient survey coverage
+
+```{r, echo=FALSE}
+library(here)
+
+knitr::include_graphics(here("figures/VMNIS_heatmap_pw.png"))
+
+
 ```
 
-<aside class="notes">
-Figure 1 placeholder for Type 1 coverage by country‑year. See Manus_data sources landscape_2025 draft.
-</aside>
+# VMNIS Micronutrient survey coverage - dropping anemia
 
-# Micronutrient survey coverage
+```{r, echo=FALSE}
 
-```{r fig-dhs-domains, eval=FALSE}
-# TODO: Plot DHS indicator domain coverage (Figure 2 placeholder)
+
+knitr::include_graphics(here("figures/VMNIS_heatmap_pw_alt.png"))
+
+
 ```
 
 # Predictor data aggregation workflow
@@ -61,7 +76,7 @@ library(sf)
 library(terra)
 library(SuperLearner)
 # source utility functions
-source("R/dhs_surface.R")
+#source("R/dhs_surface.R")
 ```
 
 <div class="fragment">
@@ -89,11 +104,13 @@ Steps
 
 # Variable importance
 
-```{r vip-plot, eval=FALSE}
-# TODO: ggplot variable importance bars grouped by domain
+```{r vip-plot, echo=FALSE}
+
+knitr::include_graphics(here("figures/DHS_Ghana_SL_vim_diff.png"))
+
 ```
 
-# Prediction map (Admin 1)
+# Prediction map (Admin 1)
 
 ```{r pred-map, eval=FALSE}
 # TODO: plot predicted anemia prevalence with terra::plot
@@ -105,11 +122,6 @@ Steps
 # TODO: placeholder for bootstrap CI ribbon plot
 ```
 
-# Budget & resource allocation
-
-- UCB subaward total: **$321,067** across two years  
-- Year 1 direct costs: $143,176, IDC 10%  
-- Personnel: PI (Hubbard 7%), Co‑PI (Mertens 25%), GSR 50%, UG assistant 15 h/wk
 
 # Next steps
 
@@ -128,8 +140,3 @@ Steps
 ---
 
 # Appendix
-
-## Session info
-
-```{r session-info}
-sessionInfo()
