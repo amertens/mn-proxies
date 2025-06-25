@@ -134,14 +134,6 @@ table(is.na(df$cassava ))
 # Malaria Atlas
 #-------------------------------------------------------------------------------
 
-pts    <- vect(geo_df,
-               geom = c("longitude", "latitude"),
-               crs  = "EPSG:4326")                   # WGS‑84 (same as MAP rasters)
-
-pfpr20  <- rast("2020_GH_pfpr_mean.tif")             # replace name as needed
-
-#202406
-
 GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface <- rast(here("data/Malaria Atlas/GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface.tif"))
 geo_df$Global_Travel_Speed_Friction_Surface <- extract(GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface, pts)[, 2]           # [,1] is the row ID terra adds
 
