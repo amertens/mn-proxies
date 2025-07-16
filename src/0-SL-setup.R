@@ -24,6 +24,24 @@ polyspline<-Lrnr_polspline$new()
 #screened_hal <- make_learner(Pipeline, screen_glmnet, hal_lrnr)
 
 
+stack_simple <- make_learner(
+  Stack,
+  lrnr_mean,
+  lrnr_glmnet
+)
+
+
+
+metalearner <- make_learner(Lrnr_nnls)
+
+sl_simple <- make_learner(Lrnr_sl,
+                   learners = stack_simple,
+                   loss_function = loss_loglik_binomial,
+                   metalearner = metalearner
+)
+
+
+
 
 stack <- make_learner(
   Stack,
@@ -37,13 +55,6 @@ stack <- make_learner(
   #screened_hal
 )
 
-# stack <- make_learner(
-#   Stack,
-#   lrnr_mean,
-#   lrnr_glmnet
-# )
-
-metalearner <- make_learner(Lrnr_nnls)
 
 sl <- make_learner(Lrnr_sl,
                    learners = stack,

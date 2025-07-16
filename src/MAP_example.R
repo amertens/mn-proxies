@@ -1,6 +1,6 @@
 
-install.packages("malariaAtlas")
-install.packages("terra")
+# install.packages("malariaAtlas")
+# install.packages("terra")
 library(terra)
 library(malariaAtlas)
 
@@ -19,7 +19,7 @@ MDG_shp <- getShp(ISO = "GHA", admin_level = "admin0")
 autoplot(MDG_shp)
 
 # Get the raster data for the specified dataset and shapefile (sometimes you may need to specify year)
-MDG_PfPR2_10 <- getRaster(dataset_id = "Explorer__2019_Nature_Africa_Housing_2015", shp = MDG_shp)
+MDG_PfPR2_10 <- getRaster(dataset_id = "Malaria__202206_Global_Pf_Mortality_Count", shp = MDG_shp, year =2017)
 
 #plot the raster
 p <- autoplot(MDG_PfPR2_10, shp_df = MDG_shp)
