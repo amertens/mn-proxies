@@ -15,10 +15,15 @@ d <- dhs_data(countryIds = "GH",
 sp <- download_boundaries(surveyId = d$SurveyId[1])
 
 
+dhs_indicators()
+dhs_indicators_df <- dhs_indicators(returnFields=c("IndicatorId","ShortName","Label","Definition"," Level1", "Level2", "Level3", "MeasurementType", "Denominator"))
+write.csv(dhs_indicators_df, file = here("data/DHS/clean/dhs_indicators_metadata.csv"), row.names = FALSE)
 
-dhs_indicators_df <- dhs_indicators(returnFields=c("IndicatorId","Label","Definition"))
+unique(dhs_indicators_df$Level1)
+unique(dhs_indicators_df$Level2)
+unique(dhs_indicators_df$Level3)
 
-#for(i in 1:2) {
+#for(i in 1:2)
 for(i in 1:nrow(dhs_indicators_df)) {
   cat(paste0(dhs_indicators_df$IndicatorId[i], ": ", dhs_indicators_df$Label[i]), "\n")
   # make request

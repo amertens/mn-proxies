@@ -59,7 +59,7 @@ poly.adm1 <- geodata::gadm(country="Ghana", level=1, path=tempdir())
 poly.adm1 <- sf::st_as_sf(poly.adm1)
 poly.adm2 <- geodata::gadm(country="Ghana", level=2, path=tempdir())
 poly.adm2 <- sf::st_as_sf(poly.adm2)
-try(geo <- getDHSgeo(country = "Ghana", year = 2019))
+geo<-readRDS(here("data/DHS_compiled_gps_data.rds")) %>% filter(country == "Ghana" & year == 2019)
 
 geo_df <- as.data.frame(geo) %>% select(DHSCLUST, LATNUM, LONGNUM) %>%
   rename(
@@ -135,7 +135,7 @@ table(is.na(df$cassava ))
 #-------------------------------------------------------------------------------
 
 GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface <- rast(here("data/Malaria Atlas/GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface.tif"))
-geo_df$Global_Travel_Speed_Friction_Surface <- extract(GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface, pts)[, 2]           # [,1] is the row ID terra adds
+geo_df$Global_Travel_Speed_Friction_Surface <- terra::extract(GHA_Accessibility_201501_Global_Travel_Speed_Friction_Surface, pts)[, 2]           # [,1] is the row ID terra adds
 
 GHA_Malaria_202406_Global_Pv_Parasite_Rate  <-rast(here("data/Malaria Atlas/GHA_Malaria_202406_Global_Pv_Parasite_Rate.tif"))
 geo_df$Global_Pv_Parasite_Rate <- extract(GHA_Malaria_202406_Global_Pv_Parasite_Rate, pts)[, 2]           # [,1] is the row ID terra adds
