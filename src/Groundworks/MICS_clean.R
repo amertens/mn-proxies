@@ -5,6 +5,7 @@ library(haven)
 library(dplyr)
 library(janitor)
 library(survey)
+library(srvyr)       # wrapper around survey
 library(fastDummies)
 library(purrr)
 library(stringr)
@@ -73,6 +74,20 @@ print(vars_kept)
 needed <- c("region", grep("weight$", names(d), value = TRUE), vars_kept, "treat_any", "san_shared","animals","floor")
 d_trim <- d %>% select(any_of(needed)) %>% clean_names()
 
+#clean region
+# value         label
+# 1       WESTERN
+# 2       CENTRAL
+# 3 GREATER ACCRA
+# 4         VOLTA
+# 5       EASTERN
+# 6       ASHANTI
+# 7   BRONG AHAFO
+# 8      NORTHERN
+# 9    UPPER EAST
+# 10    UPPER WEST
+d_trim$region <- factor(d_trim$region, levels=1:10, labels=c("Western",'Central',"Greater Accra","Volta","Eastern","Ashanti","Brong Ahafo","Northern","Upper East","Upper West"))
+
 # identify the weight column we just kept
 wt_var <- grep("weight$", names(d_trim), value = TRUE)[1]
 
@@ -89,124 +104,54 @@ d_trim <- d_trim %>%
     )
   )
 
-# ── 6 · Survey design object ──────────────────────────────────────────────
-d_trim$hhweight <- as.numeric(d_trim$hhweight)
-des <- svydesign(ids = ~1,
-                 weights = as.formula(paste0("~", wt_var)),
-                 data    = d_trim)
+svy <- d_trim %>%
+  as_survey_design(weights = !!sym(wt_var))   # srvyr magic
 
-# ── 7 · Numeric summaries (weighted means) ───────────────────────────────
-
-head(d_trim)
+# ----------------------- 3 · NUMERIC FEATURES ------------------------------
 
 num_vars <- d_trim %>%
-  select(-region, -all_of(wt_var)) %>%
+  select(-all_of(wt_var), -region) %>%  # drop weight + group var
   select(where(is.numeric)) %>%
   names()
 
-num_tbl <- svyby(
-  as.formula(paste("~", paste(num_vars, collapse = "+"))),
-  ~region, des, svymean, na.rm = TRUE, vartype = NULL
-)
+num_summary <- svy %>%
+  group_by(region) %>%
+  summarise(
+    across(
+      all_of(num_vars),
+      ~ survey_mean(., na.rm = TRUE, vartype = "se"),  # mean + SE
+      .names = "{.col}"
+    ),
+    .groups = "drop"
+  )
 
-head(num_tbl)
+
 # ── 8 · Categorical summaries (weighted proportions) ─────────────────────
 cat_vars <- d_trim %>% select(-region) %>%
   select(-where(is.numeric)) %>%
-   names()
-
-
-  cat_dummy <- d_trim %>%
-    select( all_of(wt_var), all_of(cat_vars)) %>%
-    fastDummies::dummy_cols(remove_first_dummy = FALSE,
-                            remove_selected_columns = TRUE) %>%
-    clean_names()
-  colnames(cat_dummy)
-
-  cat_dummy <- data.frame(region=d_trim$region, cat_dummy)
-  head(cat_dummy)
-
-  des_cat <- svydesign(ids = ~1,
-                       weights = as.formula(paste0("~", wt_var)),
-                       data    = cat_dummy)
-
-  rhs <- setdiff(colnames(cat_dummy), c("region", wt_var))
-  cat_tbl <- svyby(
-    as.formula(paste("~", paste(rhs, collapse = "+"))),
-    ~region, des_cat, svymean, na.rm = TRUE, vartype = NULL
-  )
-
-  region_summary <- left_join(num_tbl, cat_tbl, by = "region")
-
-
-# ── 9 · Output ────────────────────────────────────────────────────────────
-print(dim(region_summary))
-
-
-
-# ── 1 · Clean column names (safer for formulas) ─────────────────────────────
-d <- d %>% clean_names()
-
-# ── 2 · Identify the weight variable automatically ─────────────────────────
-wt_var <- names(d)[str_detect(names(d), "weight$")]
-# if (length(wt_var) != 1)
-#   stop("Could not uniquely identify a weight column. Please set wt_var manually.")
-wt_var <- "hhweight"
-
-# ── 3 · Ensure categorical variables are true factors ──────────────────────
-d <- d %>% mutate(across(where(is.labelled), as_factor))
-
-# ── 4 · Build a survey‑design object ───────────────────────────────────────
-des <- svydesign(
-  ids     = ~1,                 # already PSUs collapsed in your ‘d’
-  weights = as.formula(paste0("~", wt_var)),
-  data    = d
-)
-
-# ── 5 · NUMERIC variables: survey‑weighted means by region ─────────────────
-num_vars <- d %>%
-  select(-region, -all_of(wt_var)) %>%
-  select(where(is.numeric)) %>%
   names()
 
-num_tbl <- svyby(
-  as.formula(paste("~", paste(num_vars, collapse = "+"))),
-  ~region, des, svymean, na.rm = TRUE, vartype = NULL
+
+cat_dummy <- d_trim %>%
+  select( all_of(wt_var), all_of(cat_vars)) %>%
+  fastDummies::dummy_cols(remove_first_dummy = FALSE,
+                          remove_selected_columns = TRUE) %>%
+  clean_names()
+colnames(cat_dummy)
+
+cat_dummy <- data.frame(region=d_trim$region, cat_dummy)
+head(cat_dummy)
+
+des_cat <- svydesign(ids = ~1,
+                     weights = as.formula(paste0("~", wt_var)),
+                     data    = cat_dummy)
+
+rhs <- setdiff(colnames(cat_dummy), c("region", wt_var))
+cat_tbl <- svyby(
+  as.formula(paste("~", paste(rhs, collapse = "+"))),
+  ~region, des_cat, svymean, na.rm = TRUE, vartype = NULL
 )
 
-# ── 6 · CATEGORICAL variables: survey‑weighted proportions by region ──────
-cat_vars <- d %>%
-  select(-where(is.numeric)) %>%
-  select(-region) %>%
-  names()
+region_summary <- left_join(num_summary, cat_tbl, by = "region")
 
-if (length(cat_vars) > 0) {
-  cat_dummy <- d %>%
-    select(region, all_of(wt_var), all_of(cat_vars)) %>%
-    fastDummies::dummy_cols(select_columns = c(all_of(wt_var), all_of(cat_vars)),
-                            remove_first_dummy = FALSE,
-                            remove_selected_columns = TRUE) %>%
-    clean_names()
-
-  des_cat <- svydesign(
-    ids     = ~1,
-    weights = as.formula(paste0("~", wt_var)),
-    data    = cat_dummy
-  )
-
-  rhs <- setdiff(colnames(cat_dummy), c("region", wt_var))
-  cat_tbl <- svyby(
-    as.formula(paste("~", paste(rhs, collapse = "+"))),
-    ~region, des_cat, svymean, na.rm = TRUE, vartype = NULL
-  )
-
-  # ── 7 · Merge numeric + categorical summaries ────────────────────────────
-  region_summary <- left_join(num_tbl, cat_tbl, by = "region")
-
-} else {
-  region_summary <- num_tbl
-}
-
-# ── 8 · Inspect / save ─────────────────────────────────────────────────────
-print(dim(region_summary))  # rows = 10 regions; columns = 1 + all summaries
-# write_csv(region_summary, "outputs/mics2017_region_summary.csv")
+write_csv(region_summary, here("data/MICS/mics_ghana_2017_region_summary.csv"))

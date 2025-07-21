@@ -12,7 +12,7 @@ library(here)
 # ---- 1.  Read data ----
 hh   <- read_dta(here("data/LSMS/g7aggregates_hhlevel.dta"))  %>% clean_names()
 ind  <- read_dta(here("data/LSMS/g7aggregates_indlevel.dta")) %>% clean_names()
-)
+
 table(ind$region)
 
 
