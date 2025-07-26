@@ -35,6 +35,13 @@ stack_simple <- make_learner(
 metalearner <- make_learner(Lrnr_nnls)
 
 sl_simple <- make_learner(Lrnr_sl,
+                              learners = stack_simple,
+                              loss_function = loss_squared_error,
+                              metalearner = metalearner
+)
+
+
+sl_simple_bin <- make_learner(Lrnr_sl,
                    learners = stack_simple,
                    loss_function = loss_loglik_binomial,
                    metalearner = metalearner
@@ -56,20 +63,101 @@ stack <- make_learner(
 )
 
 
-sl <- make_learner(Lrnr_sl,
+slmod <- make_learner(Lrnr_sl,
                    learners = stack,
-                   loss_function = loss_loglik_binomial,
+                   loss_function = loss_squared_error,
                    metalearner = metalearner
 )
-slmod=sl
+
+slmod_bin <- make_learner(Lrnr_sl,
+                          learners = stack,
+                          loss_function = loss_loglik_binomial,
+                          metalearner = metalearner
+)
+
+
+
+#---------------------------
+# 2. Define base learners
+#---------------------------
+lrn_glm     <- Lrnr_glm$new()
+lrn_mean    <- Lrnr_mean$new()
+lrn_ridge   <- Lrnr_glmnet$new(alpha = 0)
+lrn_lasso   <- Lrnr_glmnet$new(alpha = 1)
+lrn_rf      <- Lrnr_ranger$new()
+lrn_xgb     <- Lrnr_xgboost$new()
+lrn_hal     <- Lrnr_hal9001$new(max_degree = 2, num_knots = c(3, 2), nfolds = 5)
+lrn_gam     <- Lrnr_gam$new()
+lrn_bayes   <- Lrnr_bayesglm$new()
+lrn_polspline <- Lrnr_polspline$new()
+
+#---------------------------
+# 3. Add learners with screeners (prescreening)
+#---------------------------
+
+# A. Top 10 importance-based screener (e.g., Random Forest)
+rf_importance <- Lrnr_ranger$new(importance = "impurity_corrected")
+screen_rf_top10 <- Lrnr_screener_importance$new(learner = rf_importance, num_screen = 10)
+screen_rf_top10_stack <- Pipeline$new(screen_rf_top10, Stack$new(lrn_glm, lrn_rf, lrn_xgb))
+screen_rf_top10_hal_stack <- Pipeline$new(screen_rf_top10, Stack$new(lrn_hal, lrn_rf, lrn_xgb))
+
+# B. Lasso-based screener (non-zero coefficients)
+screen_lasso <- Lrnr_screener_coefs$new(learner = lrn_lasso, threshold = 0)
+screen_lasso_stack <- Pipeline$new(screen_lasso, Stack$new(lrn_glm, lrn_rf))
+
+# C. Correlation-based screener (top 10)
+screen_cor <- Lrnr_screener_correlation$new(type = "rank", num_screen = 10)
+screen_cor_stack <- Pipeline$new(screen_cor, Stack$new(lrn_glm, lrn_mean))
+
+
+#---------------------------
+# 4. Assemble full stack
+#---------------------------
+full_stack <- Stack$new(
+  lrn_mean,
+  glm_fast,
+  ranger_lrnr,
+  xgboost_lrnr,
+  lrn_rf,
+  lrn_xgb,
+  screen_rf_top10_hal_stack,
+  lrn_gam, lrn_bayes, lrn_polspline,
+   screen_rf_top10_stack, screen_lasso_stack,
+   screen_cor_stack
+)
+
+slfull <- make_learner(Lrnr_sl,
+                          learners = full_stack,
+                          loss_function = loss_squared_error,
+                          metalearner = metalearner
+)
+
+slfull_bin <- make_learner(Lrnr_sl,
+                       learners = full_stack,
+                       loss_function = loss_loglik_binomial,
+                       metalearner = metalearner
+)
+
+
 
 
 
 DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", id="cluster", folds=5, CV=F, sl){
+
   X = d %>% select(!!Xvars) %>% as.data.frame()
   cov=unlabelled(X, user_na_to_na = TRUE)
   Y = d[[outcome]]
   id = d[[id]]
+
+  # Drop columns that are entirely NA
+  cov <- cov[, !sapply(cov, function(x) all(is.na(x)))]
+
+  #drop columns with no variation
+  cov <- cov %>%
+    select(where(~{
+      non_na <- .x[!is.na(.x)]
+      length(non_na) > 0 && length(unique(non_na)) > 1
+    }))
 
   #impute missing and Drop near-zero variance predictors
   cov <- cov %>%
@@ -82,6 +170,20 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", id="cluster", folds=5, CV
   if(length(nzv_cols) > 0){
     cov <- cov[, -nzv_cols]
   }
+
+  #additional cleaning
+  auto_recipe <- recipe(~ ., data = cov) %>%
+    #not needed as done above:
+    #step_impute_knn(all_predictors()) %>%      # Your current KNN imputation
+    #step_zv(all_predictors()) %>%              # Remove zero variance (better than your current)
+    #step_nzv(all_predictors()) %>%             # Remove near-zero variance
+    step_corr(all_numeric(), threshold = 0.9) %>%  # Remove highly correlated
+    step_normalize(all_numeric()) %>%          # Scale numeric features
+    step_dummy(all_nominal()) %>%              # Handle categorical
+    prep()
+
+  cov <- bake(auto_recipe, new_data = cov)
+
 
   cov <- data.frame(cov)
   covars=colnames(cov)
@@ -106,7 +208,7 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", id="cluster", folds=5, CV
     suppressMessages(sl_fit <- cv_sl$train(SL_task))
     #glm_fit <- cv_glm$train(SL_task)
   }else{
-    suppressMessages(sl_fit <- slmod$train(SL_task))
+    suppressMessages(sl_fit <- sl$train(SL_task))
     #glm_fit <- glm_sl$train(SL_task)
   }
 
@@ -120,7 +222,10 @@ DHS_SL <- function(d, Xvars, outcome="mod_sev_anemia", id="cluster", folds=5, CV
   yhat_full <- sl_fit$predict_fold(SL_task,"validation")
 
 
-  return(list(sl_fit=sl_fit, yhat_full=yhat_full,cv_risk_w_sl_revere=cv_risk_w_sl_revere,
+  return(list(sl_fit=sl_fit,
+              yhat_full=yhat_full,
+              cv_risk_w_sl_revere=cv_risk_w_sl_revere,
+              task=SL_task,
               Xvars=SL_task$column_names))
 }
 

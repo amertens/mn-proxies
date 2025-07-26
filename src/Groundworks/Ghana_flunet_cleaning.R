@@ -119,11 +119,15 @@ cat("Based on the data structure, subnational flu surveillance data for Ghana 20
 cat("All records show 'Ghana' as the location, indicating national-level reporting only.\n")
 cat("This is common for many countries in the FluNet system where only national surveillance is conducted.\n")
 
-# Export results
 
+#clean time data
+weekly_summary$year <- year(weekly_summary$ISO_WEEKSTARTDATE)
+
+
+# Export results
+colnames(weekly_summary)
+weekly_summary <- weekly_summary %>% select(ISO_WEEK, inf_a_rate, inf_b_rate, inf_all_calculated) %>% rename(week=ISO_WEEK)
+colnames(weekly_summary) <- paste0("flunet_", colnames(weekly_summary))
 write.csv(weekly_summary, here("data/FluNet/Ghana/ghana_2017_weekly_flu_summary.csv"), row.names = FALSE)
 write.csv(overall_summary,  here("data/FluNet/Ghana/ghana_2017_overall_flu_summary.csv"), row.names = FALSE)
 
-cat("\nResults exported to CSV files:\n")
-cat("- ghana_2017_weekly_flu_summary.csv\n")
-cat("- ghana_2017_overall_flu_summary.csv\n")

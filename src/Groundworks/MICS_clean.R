@@ -154,4 +154,6 @@ cat_tbl <- svyby(
 
 region_summary <- left_join(num_summary, cat_tbl, by = "region")
 
+colnames(region_summary) <- paste0("mics_",colnames(region_summary))
+
 write_csv(region_summary, here("data/MICS/mics_ghana_2017_region_summary.csv"))
